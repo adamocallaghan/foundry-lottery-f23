@@ -16,11 +16,7 @@ contract Raffle is VRFConsumerBaseV2 {
     error Raffle__InsufficientEthForTicket();
     error Raffle__TransferFaield();
     error Raffle__RaffleNotOpen();
-    error Raffle__UpkeepNotNeeded(
-        uint256 currentBalance,
-        uint256 numPlayers,
-        uint256 raffleState
-    );
+    error Raffle__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffleState);
 
     event EnteredRaffle(address indexed player);
     event PickedWinner(address indexed winner);
@@ -93,7 +89,7 @@ contract Raffle is VRFConsumerBaseV2 {
     function checkUpkeep(
         // Chainlink Automatiion just uses checkUpkeep to CHECK for the status, it use performUpkeep to trigger your desired function
         bytes memory /* checkData */
-    ) public view returns (bool upkeepNeeded, bytes memory /* performData */) {
+    ) public view returns (bool upkeepNeeded, bytes memory /* performData */ ) {
         bool timeHasPassed = (block.timestamp - s_lastTimeStamp) >= i_interval;
         bool isOpen = RaffleState.OPEN == s_raffleState;
         bool hasBalance = address(this).balance > 0;
@@ -102,48 +98,23 @@ contract Raffle is VRFConsumerBaseV2 {
         return (upkeepNeeded, "0x0");
     }
 
-    function performUpkeep(bytes calldata /* performData */) external {
-        (bool upkeepNeeded, ) = checkUpkeep("");
+    function performUpkeep(bytes calldata /* performData */ ) external {
+        (bool upkeepNeeded,) = checkUpkeep("");
         // require(upkeepNeeded, "Upkeep not needed");
         if (!upkeepNeeded) {
-            revert Raffle__UpkeepNotNeeded(
-                address(this).balance,
-                s_players.length,
-                uint256(s_raffleState)
-            );
+            revert Raffle__UpkeepNotNeeded(address(this).balance, s_players.length, uint256(s_raffleState));
         }
         s_raffleState = RaffleState.CALCULATING;
         uint256 requestId = i_vrfCoordinator.requestRandomWords(
-            i_gasLane,
-            i_subscriptionId,
-            REQUEST_CONFIRMATIONS,
-            i_callbackGasLimit,
-            NUM_WORDS
+            i_gasLane, i_subscriptionId, REQUEST_CONFIRMATIONS, i_callbackGasLimit, NUM_WORDS
         );
         // Quiz... is this redundant?
         emit RequestedRaffleWinner(requestId);
     }
 
-    function pickWinner() public {
-        // after a period of time has expired
-        if ((block.timestamp - s_lastTimeStamp) < i_interval) {
-            revert();
-        }
-        s_raffleState = RaffleState.CALCULATING;
-        // call Chainlink VRF to get random number (import Chainlink contract)
-        i_vrfCoordinator.requestRandomWords(
-            i_gasLane, // gas lane
-            i_subscriptionId,
-            REQUEST_CONFIRMATIONS,
-            i_callbackGasLimit,
-            NUM_WORDS
-        );
-        // use random number to select player
-        // be automatically called
-        // send ETH in this contract to the winning player's address
-    }
-
-    /** Getter Functions **/
+    /**
+     * Getter Functions *
+     */
 
     function getEntranceFee() external view returns (uint256) {
         return i_entranceFee;
@@ -170,10 +141,7 @@ contract Raffle is VRFConsumerBaseV2 {
     }
 
     // CEI: CHECKS, EFFECTS, INTERACTIONS
-    function fulfillRandomWords(
-        uint256 /* requestId */,
-        uint256[] memory randomWords
-    ) internal override {
+    function fulfillRandomWords(uint256, /* requestId */ uint256[] memory randomWords) internal override {
         // CHECKS
         // EFFECTS
         uint256 playersLength = s_players.length;
@@ -187,7 +155,7 @@ contract Raffle is VRFConsumerBaseV2 {
         emit PickedWinner(winner);
 
         // INTERACTIONS
-        (bool success, ) = winner.call{value: address(this).balance}("");
+        (bool success,) = winner.call{value: address(this).balance}("");
         if (!success) {
             revert Raffle__TransferFaield();
         }
