@@ -24,6 +24,7 @@ contract Raffle is VRFConsumerBaseV2 {
 
     event EnteredRaffle(address indexed player);
     event PickedWinner(address indexed winner);
+    event RequestedRaffleWinner(uint256 indexed requestId);
 
     /* Type Declarations */
     enum RaffleState {
@@ -101,8 +102,9 @@ contract Raffle is VRFConsumerBaseV2 {
         return (upkeepNeeded, "0x0");
     }
 
-    function performUpkeep(bytes calldata /* performData */) external view {
+    function performUpkeep(bytes calldata /* performData */) external {
         (bool upkeepNeeded, ) = checkUpkeep("");
+        // require(upkeepNeeded, "Upkeep not needed");
         if (!upkeepNeeded) {
             revert Raffle__UpkeepNotNeeded(
                 address(this).balance,
@@ -110,6 +112,16 @@ contract Raffle is VRFConsumerBaseV2 {
                 uint256(s_raffleState)
             );
         }
+        s_raffleState = RaffleState.CALCULATING;
+        uint256 requestId = i_vrfCoordinator.requestRandomWords(
+            i_gasLane,
+            i_subscriptionId,
+            REQUEST_CONFIRMATIONS,
+            i_callbackGasLimit,
+            NUM_WORDS
+        );
+        // Quiz... is this redundant?
+        emit RequestedRaffleWinner(requestId);
     }
 
     function pickWinner() public {
